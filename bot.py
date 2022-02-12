@@ -5,6 +5,7 @@ import datetime
 import random
 import re
 import discord
+import stupid
 from pytube import Playlist
 from generic_message_handler import GenericMessageHandler
 from configuration import Configuration
@@ -50,7 +51,8 @@ class CsBot(discord.Client):
         self.message_handlers.append(GenericMessageHandler("!maps", "Start registration of map preferences", "Not implemented", True))
         self.message_handlers.append(GenericMessageHandler("!purge", "???", "Not implemented", True))
         self.message_handlers.append(GenericMessageHandler("!easterEgg", "???", "Not implemented", True))
-        self.message_handlers.append(GenericMessageHandler("!dank", "???", "Not implemented", True))
+        self.message_handlers.append(GenericMessageHandler("!dad", "Random dad joke", stupid.dad_jokes(), False))
+        self.message_handlers.append(GenericMessageHandler("!dank", "???", stupid.dank(), False))
         self.message_handlers.append(GenericMessageHandler("!setAdmin", "???", "Not implemented", True))
         self.message_handlers.append(GenericMessageHandler("!removeAdmin", "???", "Not implemented", True))
         self.message_handlers.append(GenericMessageHandler("!admins", "???", "Not implemented", True))
@@ -118,6 +120,6 @@ if __name__ == "__main__":
         print("No admins added, ;only owner has access to core features")
 
 
-    config = Configuration(188422488080777217, admins, 875657026775158805, 878372503196676106)
+    config = Configuration(611905356443942912, admins, 777634252778242078, 942027332925935689)
     client = CsBot(config)
     client.run(token)
