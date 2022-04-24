@@ -1,15 +1,13 @@
 import datetime
-import random
 import constants
 import re
-from player import Player
 from team import roll_teams
-from  helper_functions import DiscordString
+from helper_functions import DiscordString
 from mapdict import MapDict
 
 
 class Match():
-    def __init__(self,date,team) -> None:
+    def __init__(self, date, team) -> None:
         self.date = date
         self.team = team
         self.status = "active"
@@ -22,16 +20,17 @@ class Match():
 
 
 class MatchDay():
-    def __init__(self,users,num_matches=2,playday="Wednesday") -> None:
+    def __init__(self, users, num_matches=2, playday="Wednesday") -> None:
         self.players = users
         self.num_matches = num_matches
         ["ready", "open", "closed"]
         self.status = "ready"
         ["active", "inactive"]
-        self.veto = "ative"
+        self.veto = "inactive"
         self.message = None
         self.banorder_message = None
         self.date = None
+        self.playtime = datetime.time(hour=20, minute=00)
         self.playday = playday
         self.map_pool = constants.maps
         self.banned_maps = []
@@ -39,14 +38,14 @@ class MatchDay():
         self.shared_banorder = []
         self.available_maps = constants.maps.copy()
         self.weekdays = {
-                'Monday':0,
-                'Tuesday':1,
-                'Wednesday':2,
-                'Thursday':3,
-                'Friday':4,
-                'Saturday':5,
-                'Sunday':6,
-            }
+            'Monday': 0,
+            'Tuesday': 1,
+            'Wednesday': 2,
+            'Thursday': 3,
+            'Friday': 4,
+            'Saturday': 5,
+            'Sunday': 6,
+        }
         self.matches = None
         self.teams = None
         self.set_playdate_next()
@@ -57,7 +56,7 @@ class MatchDay():
     def setup_matches(self):
         if self.teams:
             self.matches = []
-            for team  in  self.teams:
+            for team in self.teams:
                 self.matches.append(Match(self.date, team))
 
     def set_num_matches(self, num):
@@ -73,27 +72,27 @@ class MatchDay():
         self.banorder_message = message
 
     async def refetch_message(self):
-        self.message =  await self.message.channel.fetch_message(self.message.id)
-    
+        self.message = await self.message.channel.fetch_message(self.message.id)
+
     async def registration_end(self, player_pool):
         reply = ""
         if self.status == "open":
-            for reaction in  self.message.reactions:
+            for reaction in self.message.reactions:
                 for u in await reaction.users().flatten():
                     self.player_add(player_pool[u.id])
             if not self.teams:
-                self.teams = roll_teams(self.players,self.num_matches)
-                self.matches = [Match(self.date,team) for team in self.teams]
+                self.teams = roll_teams(self.players, self.num_matches)
+                self.matches = [Match(self.date, team) for team in self.teams]
             self.status = "closed"
             await self.message.unpin()
-            reply = "Registration ended"
+            reply = "Registration closed"
         else:
             reply = "No registration active"
 
         return reply
 
-    def registration_start(self, arguments):
-        arguments = re.match("^![a-zA-Z]*\s(\d{1,2})$",arguments)
+    def registration_start(self, arguments, teammember_role):
+        arguments = re.match("^![a-zA-Z]*\s(\d{1,2})$", arguments)
         if arguments:
             num_matches = int(arguments.group(1))
             if num_matches < 1:
@@ -110,22 +109,22 @@ class MatchDay():
                 self.set_playdate_next()
                 self.set_num_matches(num_matches)
                 self.status = "open"
-                return f"React to this post to sign up for the [{self.num_matches}] matches on: {self.date}"
+                return f"<@&{teammember_role.id}>\nReact to this post to sign up for the [{self.num_matches}] matches on: {self.date} **{str(self.playtime)[0:5]}**"
             case _:
                 raise NameError
 
     async def registration_cancel(self):
         reply = ""
-        if self.status == "ready":
-            self.players = {}
+        if self.status == "open":
+            self.reset_state()
             await self.message.unpin()
             await self.message.delete()
             self.message = None
             reply = "Cancelled registration"
         else:
             reply = "No registration active"
-        
-        return  reply
+
+        return reply
 
     def reset_state(self):
         self.veto = "inactive"
@@ -146,26 +145,23 @@ class MatchDay():
     def next_match(self):
         reply = ""
         if self.status == "active":
-            reply =  f"Next match: {self.date}\nPlaying: {[player.name for player in self.players.values()]}"
+            reply = f"Next match: {self.date}\nPlaying: {[player.name for player in self.players.values()]}"
         else:
-            reply = f"No matches found"
-        
-        return reply
+            reply = "No matches found"
 
-    def set_message(self,message):
-        self.message = message
+        return reply
 
     def set_playdate_next(self):
         days_in_week = len(self.weekdays.keys())
         today = datetime.date.today()
         days_to = self.weekdays[self.playday] - datetime.date.weekday(today)
-        if days_to < 0: # we are past playday this week
+        if days_to < 0:  # we are past playday this week
             days_to += days_in_week
-        self.date =  today + datetime.timedelta(days_to)
+        self.date = today + datetime.timedelta(days_to)
 
     def get_teamlist(self) -> str:
         teams = DiscordString("")
-        for i,team in self.teams.items():
+        for i, team in self.teams.items():
             teams += team.get_info()
         teams = teams.to_code_block("ml")
         return teams
@@ -181,9 +177,9 @@ class MatchDay():
         for map in self.shared_banorder:
             if map in self.available_maps:
                 return map
-    
+
     def get_next_pick(self):
-        maps =  reversed(self.shared_banorder)
+        maps = reversed(self.shared_banorder)
         for map in maps:
             if map in self.available_maps:
                 return map
@@ -215,7 +211,7 @@ class MatchDay():
 
     async def unban(self, map):
         if self.banorder_message:
-            self.banned_maps.remove(map) 
+            self.banned_maps.remove(map)
             self.available_maps.append(map)
             await self.banorder_message.edit(content=self.banorder())
         else:
@@ -223,10 +219,10 @@ class MatchDay():
 
     def team_to_map_fit(self):
         scores = {}
-        for map in  self.picked_maps:
+        for map in self.picked_maps:
             scores[map] = {}
-            for id,team in  self.teams.items():
-                scores[map][id]=0
+            for id, team in self.teams.items():
+                scores[map][id] = 0
                 for player in team.players:
                     scores[map][id] += player.maps[map]
                 try:
@@ -234,9 +230,9 @@ class MatchDay():
                 except ZeroDivisionError:
                     pass
         for map in self.available_maps:
-            scores[map] ={}
-            for id,team in  self.teams.items():
-                scores[map][id]=0
+            scores[map] = {}
+            for id, team in self.teams.items():
+                scores[map][id] = 0
                 for player in team.players:
                     scores[map][id] += player.maps[map]
                 try:
@@ -246,9 +242,9 @@ class MatchDay():
         pprint = ""
         for map, teams in scores.items():
             pprint += f"{map}: "
-            for team,score in teams.items():
+            for team, score in teams.items():
                 pprint += f"Team{team}[{score}] "
-            pprint  += "\n"
+            pprint += "\n"
         return pprint
 
     def _get_banorder_info(self):
@@ -260,18 +256,21 @@ class MatchDay():
         'picked_maps': <DiscordString> empty or one  message with currently picked maps  in this veto
         'team_fit':  <DiscordString> empty or one message with team score for each map picked in veto
         '''
-        messages ={
-            'private_banorders':{},
-            'shared_banorder':"",
-            'banned_maps':"",
-            'picket_maps':""
+        messages = {
+            'private_banorders': {},
+            'shared_banorder': "",
+            'banned_maps': "",
+            'picket_maps': ""
         }
-        for team_num,team in self.teams.items():
-            messages['private_banorders'][team_num] = DiscordString(f"Team {team_num}: {[player.name for player in team.players]}\nbanorder -> {team.get_banorder()}")
+        for team_num, team in self.teams.items():
+            messages['private_banorders'][team_num] = DiscordString(
+                f"Team {team_num}: {[player.name for player in team.players]}\nbanorder -> {team.get_banorder()}")
         self.shared_banorder = self.get_shared_banorder()
         messages['shared_banorder'] = DiscordString(f"{self.shared_banorder}")
-        messages['banned_maps'] = DiscordString(f"{[map for map in self.banned_maps]}")
-        messages['picked_maps'] = DiscordString(f"{[map for map in self.picked_maps]}")
+        messages['banned_maps'] = DiscordString(
+            f"{[map for map in self.banned_maps]}")
+        messages['picked_maps'] = DiscordString(
+            f"{[map for map in self.picked_maps]}")
         messages['team_fit'] = DiscordString(f"{self.team_to_map_fit()}")
         return messages
 
@@ -285,9 +284,12 @@ class MatchDay():
                     raise AttributeError("teams not rolled")
                 banorder_info = self._get_banorder_info()
                 reply += f"Shared banorder: {banorder_info['shared_banorder'].to_code_block('ml')}"
-                reply += DiscordString(f"Banned maps -> {banorder_info['banned_maps'].to_code_inline()}\n")
-                reply += DiscordString(f"Picked maps -> {banorder_info['picked_maps'].to_code_inline()}\n")
-                reply += DiscordString(f"{banorder_info['team_fit'].to_code_inline()}")
+                reply += DiscordString(
+                    f"Banned maps -> {banorder_info['banned_maps'].to_code_inline()}\n")
+                reply += DiscordString(
+                    f"Picked maps -> {banorder_info['picked_maps'].to_code_inline()}\n")
+                reply += DiscordString(
+                    f"{banorder_info['team_fit'].to_code_inline()}")
             case "ready":
                 raise AttributeError("ready")
             case _:
@@ -295,9 +297,9 @@ class MatchDay():
         return reply
 
     def shared_weighted_preference(self, private_preferences):
-        shared_preference =  MapDict()
+        shared_preference = MapDict()
         for map in self.available_maps:
-            shared_preference[map] =  0
+            shared_preference[map] = 0
             for preference in private_preferences.values():
                 shared_preference[map] += preference[map]
 
@@ -318,7 +320,8 @@ class MatchDay():
             banorder.remove_picked_maps(self.picked_maps)
             banorder.amplify_most_wanted()
 
-        shared_banorder  = self.shared_weighted_preference(private_banorders).to_list_sorted()
+        shared_banorder = self.shared_weighted_preference(
+            private_banorders).to_list_sorted()
 
         return shared_banorder
 

@@ -44,69 +44,83 @@ class CsBot(discord.Client):
         self.message_handlers = []
         self.reaction_handlers = []
 
-    def handler_setup(self):
+    async def handler_setup(self):
         self.log.info("Setting up handlers..")
         self.message_handlers.append(
             GenericMessageHandler("???", "Not implemented", True))
         self.log.debug("genericMessageHandler... OK")
         registrationhandler = RegistrationHandler(
-            "server_players.db", "Register new match", "Not implemented", False)
+            self.config.role, "server_players.db", "Register new match", "Not implemented", False, logging.INFO)
         registrationhandler.teammembers = self.config.role
         registrationhandler.broadcast_channel = self.broadcast_channel
         self.message_handlers.append(registrationhandler)
         self.reaction_handlers.append(registrationhandler)
         self.log.debug("registrationHandler... OK")
         self.message_handlers.append(StupidityHandler(
-            "Dad Jokes and Dank memes", "Dad jokes and memes", False))
+            "Dad Jokes and Dank memes", "Dad jokes and memes", False, logging.WARNING))
         self.log.debug("stupidityHandler... OK")
-        testHandler = TestHandler("Public tests", "Not implemented", False)
+        testHandler = TestHandler(
+            "Public tests", "Not implemented", False, logging.DEBUG)
         self.message_handlers.append(testHandler)
         self.reaction_handlers.append(testHandler)
-        self.message_handlers.append(AdminHandler(self,"Admin handler","Not Implemented", True))
+        self.message_handlers.append(AdminHandler(
+            self, "Admin handler", "Not Implemented", True, logging.DEBUG))
         self.log.debug("testHandler... OK")
         self.log.info("Handlers set up")
 
     def log_setup(self):
         log_format = "%(levelname)s %(name)s %(asctime)s - %(message)s"
-        logging.basicConfig(filename=f"{self.__class__.__name__}.log",filemode="w",format=log_format,level=logging.INFO)
-        self.log = logging.getLogger(self.__class__.__name__)
-        self.log.setLevel(logging.INFO)
-        for handler in self.log.handlers:
-            print(handler)
+        formatter = logging.Formatter(log_format)
+        normal_handler = logging.FileHandler(
+            f"{self.__class__.__name__}.log", mode="w")
+        normal_handler.setFormatter(formatter)
+        normal_handler.setLevel(logging.WARNING)
+
+        debug_handler = logging.FileHandler(
+            f"{self.__class__.__name__}.debug.log", mode="w")
+        debug_handler.setFormatter(formatter)
+        debug_handler.setLevel(logging.DEBUG)
+
+        self.log = logging.getLogger()
+        self.log.setLevel(logging.DEBUG)
+        self.log.propagate = False
+        self.log.addHandler(normal_handler)
+        self.log.addHandler(debug_handler)
 
     async def on_ready(self):
         self.log_setup()
         self.log.info("Backend running")
-        self.config.role = await self.get_role()
+        self.config["role"] = await self.get_role()
         self.log.debug("Role set")
         for channel in self.get_all_channels():
             if channel.name == self.config.broadcast_channel:
                 self.broadcast_channel = channel
-                # await self.broadcast_channel.send("Bot online")
+                # await self.broadcast_channel.send("I'm back!")
 
         if not self.broadcast_channel:
-            self.log.error(f"Unable to set broadcast-channel: {self.config.broadcast_channel}")
+            self.log.error(
+                f"Unable to set broadcast-channel: {self.config.broadcast_channel}")
             await self.close()
             exit(-1)
 
         self.log.debug("Broadcast-channel setup")
 
-        self.handler_setup()
+        await self.handler_setup()
 
         self.log.info("Bot ready")
-
 
     async def get_role(self):
         for g in self.guilds:
             print(g)
             for r in g.roles:
                 print(r)
-                if r.id == self.config.team_role:
-                    self.config.guild = g
+                if r.id == self.config.team_role_ID:
                     print(r)
                     return r
 
     async def on_raw_reaction_add(self, reaction):
+        if reaction.member.id == self.user.id:
+            return
         self.log.debug(f"Raw reaction add from {reaction.user_id}")
         reaction.member = self.get_member(reaction.user_id)
         if not reaction.member:
@@ -124,6 +138,8 @@ class CsBot(discord.Client):
         return member
 
     async def on_raw_reaction_remove(self, reaction):
+        if reaction.member.id == self.user.id:
+            return
         self.log.debug(f"Raw reaction remove from: {reaction.user_id}")
         reaction.member = self.get_member(reaction.user_id)
         if not reaction.member:
@@ -133,10 +149,10 @@ class CsBot(discord.Client):
             await handler.dispatch(reaction, permissions)
 
     async def on_message(self, message):
-        self.log.debug(f"Message:{message.content} from {message.author.id}")
         if message.author == self.user:
             return
         permissions = Permissions.restricted
+        self.log.debug(f"Message from: {message.author.id}")
         if isinstance(message.channel, discord.TextChannel):
             permissions = await self.get_permissions(message.author)
         elif isinstance(message.channel, discord.DMChannel):
@@ -148,11 +164,14 @@ class CsBot(discord.Client):
             await handler.dispatch(message, permissions)
 
     async def get_permissions(self, member):
-        if member.id == self.config.owner:
+        if self.broadcast_channel.permissions_for(member).administrator:
+            self.log.debug(f"Admin: {member.name}")
             return Permissions.admin
         elif self.broadcast_channel.permissions_for(member).manage_roles:
+            self.log.debug(f"Member: {member.name}")
             return Permissions.member
         else:
+            self.log.debug(f"Unknown: {member.name}")
             return Permissions.restricted
 
 
@@ -167,6 +186,5 @@ if __name__ == "__main__":
     except FileNotFoundError:
         print("Unable to read authToken")
 
-    config = Configuration()
-    client = CsBot(config)
+    client = CsBot(Configuration())
     client.run(token)
