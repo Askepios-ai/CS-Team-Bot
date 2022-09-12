@@ -1,6 +1,10 @@
 auth
 previous
 admins
+config.json
 config
 _*
-.*
+.*  
+*.log
+*.db
+testing/

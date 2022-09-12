@@ -1,185 +1,337 @@
+import os
 import re
+import pickle
+import traceback
+import constants
 from generic_message_handler import GenericMessageHandler
-from constants import Permissions, ranks, maps
+from helper_functions import DiscordString, member_check, log_message, list_active_duty, list_ranks
+from mapdict import MapDict
 from player import Player
 from match import MatchDay
 
 
+def persist_state(function):
+    async def persist_state(self, message):
+        await function(self, message)
+        self.log.info("Persisting state...")
+        with open(self.persist_file, "wb") as f:
+            pickle.dump(self.player_pool, f)
+        self.log.info("State written.")
+    return persist_state
+
+
 class RegistrationHandler(GenericMessageHandler):
-    def __init__(self,help_text,response,reply_private):
-        super().__init__(help_text,response,reply_private)
-        ["open","closed","ready"]
-        self.registration_status = "ready"
-        self.match_message = None
-        self.matchday = None
+    def __init__(self, teammember_role, persist_file, help_text, response, reply_private, log_level):
+        super().__init__(help_text, response, reply_private, log_level)
+        self.teammember_role = teammember_role
+        self.broadcast_channel = None
+        self.persist_file = persist_file
+        self.teammembers = None
+        self.matchday = MatchDay({})
         self.player_pool = {}
+        self.read_state()
 
-    async def message_list_players(self, message, permission):
-        if permission < Permissions.admin:
-            return
-        players = "UiT Players: \n"
+    def read_state(self):
+        self.log.info("Reading player state")
+        try:
+            with open(self.persist_file, "rb") as f:
+                self.player_pool = pickle.load(f)
+        except FileNotFoundError:
+            with open(self.persist_file, "wb") as f:
+                self.log.info(f"Created playerdb: {self.persist_file}")
+                pass
+        except EOFError:
+            fSize = os.stat(self.persist_file).st_size
+            match fSize:
+                case 0:
+                    self.log.warning("EOF, empty player db")
+                case _:
+                    self.log.error("EOF, likely corrupt player db")
+        except Exception as e:
+            self.log.exception("Unexpected exception")
+            self.log.debug(
+                f"{traceback.TracebackException.from_exception(e).format()}")
+
+    @member_check
+    @log_message
+    async def message_list_players(self, message):
+        players_message = "UiT Players: \n"
         for player in self.player_pool.values():
-            players += f"{player.name}: {ranks[player.rank]} maps: `{(sorted(player.maps,key=lambda k:player.maps[k],reverse=True))}`\n"
-        await self.reply(message, players)
+            players_message += f"{player.get_info()}\n"
+        await self.reply(message, players_message)
 
-    async def message_banorder(self,message,permission):
-        if permission < Permissions.admin:
-            return
-        await self.reply(message,f"{self.matchday.banorder()}")
-
-    async def message_register(self,message,permission):
-        if permission < Permissions.admin:
-            return
-        if self.registration_status == "open":
-            await self.match_message.reply("Registration already active")
-            return
-        elif self.registration_status == "closed":
-            await self.reply(message, "Registration already done, please delete the old one before starting a new registration")
-            return
-
-        arguments = re.match("^![a-zA-Z]*\s(\d{1,2}$)")
-        if arguments:
-            num_matches = int(arguments.group(1))
-            if num_matches < 1:
-                num_matches = 2
+    @member_check
+    @log_message
+    async def message_banorder(self, message):
+        if self.matchday.veto == "active":
+            await self.matchday.banorder_message.reply(":arrow_up:")
         else:
-            num_matches = 2
-        self.matchday = MatchDay({},num_matches)
+            try:
+                m = await self.reply(message, self.matchday.banorder())
+                self.matchday.set_banorder_message(m)
+                self.matchday.veto = "active"
+            except AttributeError as err:
+                await self.reply(message, f"Matchday registration status: {err}")
+            except NameError:
+                await self.reply(message, "Matchday  is in invalid state")
 
-        self.match_message = await message.channel.send(f"React to this post to sign up for the [{self.matchday.num_matches}] matches on: {self.matchday.date}")
-        self.registration_status = "open"
-
-    async def message_cancel(self, message,permission):
-        if permission < Permissions.admin:
+    @member_check
+    @log_message
+    async def message_playday(self, message):
+        args = re.match("^![a-zA-Z]+$", message.content)
+        if not args:
             return
-        if self.registration_status == "open":
-            self.matchday = None
-            self.registration_status = "ready"
-            await self.match_message.delete()
-            self.match_message = None
-            await self.reply("Cancelled match day registration")
+        await self.reply(message, f"Playday: {self.matchday.playday}")
+
+    @member_check
+    @log_message
+    async def message_playtime(self, message):
+        args = re.match("^![a-zA-Z]+$", message.content)
+        if not args:
+            return
+        await self.reply(message, f"Playtime: {str(self.matchday.playtime)[0:5]}")
+
+    @member_check
+    @log_message
+    async def message_register(self, message):
+        try:
+            self.matchday.message = await self.reply(message, self.matchday.registration_start(message.content, self.teammember_role))
+        except AttributeError as err:
+            self.log.warning(f"Registration already {err}")
+            await self.matchday.reply(f'Registration is already {err}\n')
+        except NameError:
+            self.log.critical("Registration in invalid state")
+            await self.reply(message, "Registration in invalid state\n")
+
+    @member_check
+    @log_message
+    async def message_cancel(self, message):
+        await self.reply(message, await self.matchday.registration_cancel())
+
+    @member_check
+    @log_message
+    async def message_close(self, message):
+        if self.matchday.veto == "active":
+            return
         else:
-            await self.reply(message,"No registration active")
-    
-    async def message_end(self, message,permission):
-        if permission < Permissions.admin:
-            return
-        if self.registration_status == "open":
-            self.match_message = await message.channel.fetch_message(self.match_message.id)
-            for reaction in self.match_message.reactions:
-                for u in await reaction.users().flatten():
-                    self.matchday.players[u.id] = self.player_pool[u.id]
-            self.match_message = None
-            self.registration_status = "closed"
-            await self.reply(message,"Registration ended")
-        else:
-            await self.reply(message,"No registration active")
+            await self.matchday.refetch_message()
+            await self.reply(message, await self.matchday.registration_end(self.player_pool))
+            await self.reply(message, self.matchday.get_teamlist())
+            m = await self.reply(message, self.matchday.banorder())
+            self.matchday.set_banorder_message(m)
+            self.matchday.veto = "active"
 
-    async def message_next(self,message,permission):
-        if permission < Permissions.admin:
-            return
-        if self.matchday:
-            players = [player.name for player in self.matchday.players.values()]
-            await self.reply(message,f"Next match: {self.matchday.date}\nPlaying: {players}")
-        else:
-            await self.reply(message, "No match found")
+    @member_check
+    @log_message
+    async def message_next(self, message):
+        await self.reply(message, self.matchday.next_match())
 
-    async def message_delete(self,message,permission):
-        if permission < Permissions.admin:
-            return
-        if self.registration_status == "closed":
-            date = self.matchday.date
-            day = self.matchday.playday
-            self.matchday = None
-            self.registration_status = "ready"
-            await self.reply(message, f"Registration for matchday on {day}: {date} removed")
+    @member_check
+    @log_message
+    async def message_end(self, message):
+        await self.matchday.delete()
 
-    async def message_teams(self, message, permission):
-        if permission < Permissions.admin:
-            return
-
+    @member_check
+    @log_message
+    async def message_teams(self, message):
         if not self.matchday:
             await self.reply(message, "No matches found")
-            return
+        else:
+            await self.reply(message, self.matchday.get_teamlist())
 
-        self.matchday.setup_teams()
-        teamlist = self.matchday.get_teamlist()
-        await self.reply(message, teamlist)
-
-    async def reaction_add(self,reaction,permission):
-        if permission < Permissions.admin:
-            return
-        if self.match_message and self.match_message.id == reaction.message_id:
-            if not reaction.user_id in self.player_pool:
-                self.player_pool[reaction.user_id] = Player(reaction.user_id,reaction.member.name)
+    @member_check
+    @persist_state
+    @log_message
+    async def reaction_add(self, reaction):
+        if self.matchday.message and self.matchday.message.id == reaction.message_id:
+            if reaction.user_id not in self.player_pool:
+                self.player_pool[reaction.user_id] = Player(
+                    reaction.user_id, reaction.member.name)
                 await reaction.member.send("Please register your rank with '!rank' and map-preferences with '!maps'")
 
-    def list_ranks(self):
-        ranklist = ""
-        for rank, title in ranks.items():
-            ranklist += f"{rank}: {title}\n"
-        return ranklist
+    def rank_list(self):
+        r = ""
+        for rank, title in constants.ranks.items():
+            r += f"{rank}: {title}\n"
+        return r
 
-    async def message_list_ranks(self, message, permission):
-        if permission < Permissions.admin:
-            return
-        await self.reply(message, self.list_ranks())
-
-    async def message_rank(self, message, permission):
-        if permission < Permissions.admin:
-            return
-        res = re.match("^![a-zA-Z]*\s(\d{1,})",message.content)
+    @member_check
+    @persist_state
+    @log_message
+    async def message_rank(self, message):
+        res = re.match("^![a-zA-Z]+\s(\d{1,})", message.content)
         if not res:
             await message.author.send("Please set rank with '!rank ' followed by rank number")
-            await message.author.send(f"Ranks:\n{self.list_ranks()}")
+            await message.author.send(f"Ranks:\n{self.rank_list()}")
             return
-        rank = int(res.group(1))
 
+        rank = int(res.group(1))
         if not rank:
             await message.author.send("Please set rank with '!rank ' followed by a rank number")
             return
-        if rank >18 or rank <1:
-            await message.author.send("Please set rank with '!rank ' followed by a rank number")
+        if rank > 18 or rank < 1:
+            await message.author.send("Invalid rank")
             return
-        if not message.author.id in self.player_pool:
-            player = Player(message.author.id,message.author.name)
+        if message.author.id not in self.player_pool:
+            player = Player(message.author.id, message.author.name)
             player.set_rank(rank)
             self.player_pool[player.id] = player
         else:
             player = self.player_pool[message.author.id]
             player.set_rank(rank)
-        await message.author.send(f"Your registered rank:{ranks[rank]}")
+        await message.author.send(f"Your registered rank: {constants.ranks[player.rank]}")
 
-    async def message_map_info_player(self,message,permission):
-        if not message.author.id in self.player_pool:
-            return
-        player = self.player_pool[message.author.id]
-        await self.reply(message, player.map_ranking())
+    @member_check
+    @log_message
+    async def message_player_info(self, message):
+        IDarg = re.match("^![a-zA-Z_]*\s*([\d]+)$", message.content)
+        NameArg = re.match("^![a-zA-Z_]+\s+([a-zA-Z\d]+)$", message.content)
+        if IDarg:
+            id = int(IDarg.group(1))
+            try:
+                p = self.player_pool[id]
+                await self.reply(message, p.get_info())
+            except KeyError:
+                await self.reply(message, "Player not found")
+        elif NameArg:
+            name = NameArg.group(1)
+            for id, player in self.player_pool.items():
+                if name == player.name:
+                    await self.reply(message, player.get_info())
+                    break
+        else:
+            try:
+                p = self.player_pool[message.author.id]
+                await self.reply(message, p.get_info())
+            except KeyError:
+                await self.reply(message, "Please register")
 
-    def list_maps(self) -> str:
+    @member_check
+    @persist_state
+    @log_message
+    async def message_igl_add(self, message):
+        IDarg = re.match("^![a-zA-Z_]*\s*([\d]+)$", message.content)
+        NameArg = re.match("^![a-zA-Z_]+\s+([a-zA-Z\d]+)$", message.content)
+        if IDarg:
+            id = int(IDarg.group(1))
+            try:
+                p = self.player_pool[id]
+                p.set_igl(True)
+                await self.reply(message, f"{p.name} set to IGL")
+            except KeyError:
+                await self.reply(message, "Player not found")
+        elif NameArg:
+            name = NameArg.group(1)
+            for id, player in self.player_pool.items():
+                if name == player.name:
+                    player.set_igl(True)
+                    await self.reply(message, f"{player.name} set to IGL")
+                    break
+        else:
+            try:
+                p = self.player_pool[message.author.id]
+                p.set_igl(True)
+                await self.reply(message, f"{p.name} set to IGL")
+            except KeyError:
+                await self.reply(message, "Please register")
+
+    @member_check
+    @persist_state
+    @log_message
+    async def message_igl_remove(self, message):
+        IDarg = re.match("^![a-zA-Z_]*\s*([\d]+)$", message.content)
+        NameArg = re.match("^![a-zA-Z_]+\s+([a-zA-Z\d]+)$", message.content)
+        if IDarg:
+            id = int(IDarg.group(1))
+            try:
+                p = self.player_pool[id]
+                p.set_igl(False)
+                await self.reply(message, f"{p.name} removed as IGL")
+            except KeyError:
+                await self.reply(message, "Player not found")
+        elif NameArg:
+            name = NameArg.group(1)
+            for id, player in self.player_pool.items():
+                if name == player.name:
+                    player.set_igl(False)
+                    await self.reply(message, f"{player.name} removed as IGL")
+                    break
+        else:
+            try:
+                p = self.player_pool[message.author.id]
+                p.set_igl(False)
+                await self.reply(message, f"{p.name} removed as IGL")
+            except KeyError:
+                await self.reply(message, "Please register")
+
+    @member_check
+    @log_message
+    async def message_list_active_duty(self, message):
+        await self.reply(message, list_active_duty().to_code_inline())
+
+    @member_check
+    @log_message
+    async def message_list_ranks(self, message):
+        await self.reply(message, list_ranks().to_code_inline())
+
+    def _list_maps(self) -> str:
         mapslist = ""
-        for map in maps:
+        for map in constants.maps:
             mapslist += f"{map} "
         return mapslist
 
-    async def message_maps(self, message, permission):
-        if permission < Permissions.admin:
-            return
+    @member_check
+    @persist_state
+    @log_message
+    async def message_maps(self, message):
         if message.author.id not in self.player_pool:
-            player = Player(message.author.id,message.author.name)
+            player = Player(message.author.id, message.author.name)
             self.player_pool[player.id] = player
         res = message.content.split(' ')[1:]
         if len(res) != 7:
-            await self.reply(message,f"Please give map preference as a space-separated list from most wanted to least wanted map like:\n`!maps {self.list_maps()}`")
+            self.log.debug(f"Invalid list of maps: {res}")
+            await self.reply(message, f"Please give map preference as a space-separated list from most wanted to least wanted map like:\n {DiscordString(f'!maps {self._list_maps()}').to_code_inline()}")
             return
         player = self.player_pool[message.author.id]
         try:
-            for i in range(len(maps)):
-                player.maps[res[i]] = len(maps) - i
+            tmpmap = MapDict()
+            for i in range(len(constants.maps)):
+                if not res[i] in constants.maps:
+                    raise KeyError(f"{res[i]}")
+                tmpmap[res[i]] = len(constants.maps) - i
+            for map in constants.maps:
+                if map not in tmpmap.keys():
+                    tmpmap[map] = 0
+            player.maps = tmpmap
+            await self.reply(message, DiscordString(f"{player.maps}").to_code_block("ml"))
         except Exception as e:
-            print(e)
-            await message.author.send("Invalid map name")
-        await self.reply(message, "Maps registered")
+            self.log.exception(f"Invalid map name: {e}")
+            await message.author.send(f"Invalid map name {e}")
 
-            
+    @member_check
+    @log_message
+    async def message_ban(self, message):
+        maps = message.content.split(' ')[1:]
+        for map in maps:
+            await self.matchday.ban(map)
 
+    @member_check
+    @log_message
+    async def message_unban(self, message):
+        maps = message.content.split(' ')[1:]
+        for map in maps:
+            await self.matchday.unban(map)
+
+    @member_check
+    @log_message
+    async def message_pick(self, message):
+        maps = message.content.split(' ')[1:]
+        for map in maps:
+            await self.matchday.pick(map)
+
+    @member_check
+    @log_message
+    async def message_unpick(self, message):
+        maps = message.content.split(' ')[1:]
+        for map in maps:
+            await self.matchday.unpick(map)
