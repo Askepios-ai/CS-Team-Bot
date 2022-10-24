@@ -138,9 +138,6 @@ class CsBot(discord.Client):
         return member
 
     async def on_raw_reaction_remove(self, reaction):
-        # Seems to be possible for the bot to get empty reactions
-        if reaction is None:
-            return
         if reaction.user_id == self.user.id:
             return
         self.log.debug(f"Raw reaction remove from: {reaction.user_id}")
