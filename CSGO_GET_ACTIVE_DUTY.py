@@ -23,8 +23,7 @@ def get_active_duty():
 
 
 def main():
-    page = get_page(URL)
-    AD = get_active_duty(page)
+    AD = get_active_duty()
     print(AD)
 
 
