@@ -296,11 +296,11 @@ class RegistrationHandler(GenericMessageHandler):
         player = self.player_pool[message.author.id]
         try:
             tmpmap = MapDict()
-            for i in range(len(constants.maps)):
-                if not res[i] in constants.maps:
+            for i in range(len(get_active_duty())):
+                if not res[i] in get_active_duty():
                     raise KeyError(f"{res[i]}")
-                tmpmap[res[i]] = len(constants.maps) - i
-            for map in constants.maps:
+                tmpmap[res[i]] = len(get_active_duty()) - i
+            for map in get_active_duty():
                 if map not in tmpmap.keys():
                     tmpmap[map] = 0
             player.maps = tmpmap
