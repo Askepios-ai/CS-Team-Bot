@@ -1,4 +1,4 @@
 
 
 def test_func():
-    print("Hello world2")
+    print("We should start testing")
