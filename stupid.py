@@ -27,4 +27,4 @@ class StupidityHandler(GenericMessageHandler):
         await self.reply(message, self.dank())
 
     async def message_testing(self, message, permission):
-        await self.reply(message, "ok")
+        await self.reply(message, "ok v2")
