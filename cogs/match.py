@@ -115,8 +115,10 @@ class MatchHandler(commands.Cog):
     async def playtime(self, interaction: discord.Interaction, hour: int, minute: int):
         if not self.bot.is_member(interaction.user):
             return
-        await interaction.response.send_message(f"Playtime set to {hour}:{minute}")
         self.date = self.date.replace(hour=hour, minute=minute)
+        await interaction.response.send_message(
+            f"Playtime set to {self.date.strftime('%H:%M')}"
+        )
 
     @playtime.autocomplete("hour")
     async def playtime_hour_autocomplete(
