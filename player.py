@@ -1,15 +1,15 @@
 import constants
 import random
 
-from CSGO_GET_ACTIVE_DUTY import get_active_duty
-from helper_functions import euclidean_distance, DiscordString
+from csgo import get_active_duty
+from helperfunctions import euclidean_distance, DiscordString
 from mapdict import MapDict
 
 
 class Player:
-    def __init__(self, id, name, sname):
+    def __init__(self, id, name, display_name):
         self.id = id
-        self.screen_name = sname
+        self.display_name = display_name
         self.name = name
         self.rank = 1
         self.title = constants.ranks[self.rank]
@@ -21,10 +21,6 @@ class Player:
 
     def set_igl(self, val: bool):
         self.igl = val
-
-    def set_rank(self, new_rank):
-        self.rank = new_rank
-        self.title = constants.ranks[self.rank]
 
     def rank_map(self, map, rank):
         self.maps[map] = rank
@@ -41,10 +37,19 @@ class Player:
             order += f"{map} | "
         return order.to_code_inline()
 
+    def set_rank(self, title: str):
+        self.title = title
+        self.rank = [
+            rank for rank, title in constants.ranks.items() if title == self.title
+        ][0]
+
     def get_info(self):
         s = f"{self.name} is rank {self.title} and has map order: "
         s += self.map_order()
         return s
+
+    def update_maps(self, maps: list):
+        self.maps.update_from_list(reversed(maps))
 
     def rank_compatability(self, player) -> float:
         return euclidean_distance(self.rank, player.rank)

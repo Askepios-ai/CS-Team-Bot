@@ -1,8 +1,8 @@
 import requests
-from functools import cache
+from cachetools import TTLCache, cached
 
 
-URL = 'https://counterstrike.fandom.com/wiki/Category:Active_Duty_Group'
+URL = "https://counterstrike.fandom.com/wiki/Category:Active_Duty_Group"
 
 
 def get_page(url):
@@ -10,18 +10,18 @@ def get_page(url):
     return page.text
 
 
-@cache
+@cached(cache=TTLCache(maxsize=1, ttl=86400))
 def get_active_duty():
     page = get_page(URL)
     lines = page.splitlines()
     ad = []
     for idx, line in enumerate(lines):
-        if 'Current Map' in line:
+        if "Current Map" in line:
             for line in lines[idx:]:
-                if 'Map Pool History' in line:
+                if "Map Pool History" in line:
                     return ad
                 if 'href="/wiki/' in line:
-                    ad.append(line.split('"')[1].removeprefix('/wiki/'))
+                    ad.append(line.split('"')[1].removeprefix("/wiki/"))
 
 
 def main():
@@ -29,5 +29,5 @@ def main():
     print(AD)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

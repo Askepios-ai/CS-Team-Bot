@@ -1,11 +1,11 @@
 import math
+import pickle
 import discord
 import constants
-import CSGO_GET_ACTIVE_DUTY
+import csgo
 
 
 class DiscordString(str):
-
     def __new__(self, value):
         obj = str.__new__(self, value)
         return obj
@@ -13,27 +13,31 @@ class DiscordString(str):
     def __add__(self, __s: str) -> str:
         return DiscordString(super().__add__(__s))
 
-    def to_code_block(self, format_type):
+    def to_code_block(self, format_type="ml"):
         return f"```{format_type}\n{self.__str__()}```\n"
 
     def to_code_inline(self):
         return f"`{self.__str__()}`"
 
 
-def member_check(function):
-    async def inner(self, message, permissions):
-        if permissions < constants.Permissions.member:
-            return
-        await function(self, message)
+async def do_nothing(*args, **kwargs):
+    return
+
+
+def disable(func):
+    return do_nothing
+
+
+def hide(func):
+    def inner(*args, **kwargs):
+        return func(*args, **kwargs)
+
+    inner.hidden = True
     return inner
 
 
-def admin_check(function):
-    async def inner(self, message, permissions):
-        if permissions < constants.Permissions.admin:
-            return
-        await function(self, message)
-    return inner
+def is_hidden(func):
+    return getattr(func, "hidden", False)
 
 
 def infinite_sequence_gen():
@@ -44,7 +48,7 @@ def infinite_sequence_gen():
 
 
 def euclidean_distance(val1, val2):
-    return math.sqrt((val1 - val2)**2)
+    return math.sqrt((val1 - val2) ** 2)
 
 
 def list_ranks() -> DiscordString:
@@ -54,9 +58,13 @@ def list_ranks() -> DiscordString:
     return DiscordString(ranks)
 
 
+def get_active_duty() -> list:
+    return csgo.get_active_duty()
+
+
 def list_active_duty() -> DiscordString:
     reply = "Active duty maps: | "
-    for map in CSGO_GET_ACTIVE_DUTY.get_active_duty():
+    for map in csgo.get_active_duty():
         reply += f"{map} |"
     reply += "\n"
     return DiscordString(reply)
@@ -71,4 +79,26 @@ def log_message(function):
             self.log.debug(f"Message content: {message.content}")
         await function(self, message)
         self.log.debug("OK")
+
     return inner
+
+
+def persist_state(function):
+    async def persist_state(self, *args, **kwargs):
+        await function(self, *args, **kwargs)
+        with open(self.bot.config.persist_file, "wb") as f:
+            pickle.dump(self.players, f)
+
+    return persist_state
+
+
+def load_state(function):
+    def load_state(self, *args, **kwargs):
+        function(self, *args, **kwargs)
+        try:
+            with open(self.bot.config.persist_file, "rb") as f:
+                self.players = pickle.load(f)
+        except FileNotFoundError:
+            self.players = {}
+
+    return load_state

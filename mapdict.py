@@ -1,10 +1,9 @@
-import CSGO_GET_ACTIVE_DUTY
+import csgo
 import logging
 import traceback
 
 
 class MapDict(dict):
-
     def amplify_most_wanted(self):
         factor = len(self.keys())
         weights = [16 * factor, 8 * factor, 4 * factor]
@@ -19,10 +18,10 @@ class MapDict(dict):
             try:
                 del self[banned_map]
             except NameError as e:
-                logger.debug(
-                    traceback.TracebackException.from_exception(e).format())
+                logger.debug(traceback.TracebackException.from_exception(e).format())
                 logger.exception(
-                    f"Tried banning {banned_map} not found in available maps.")
+                    f"Tried banning {banned_map} not found in available maps."
+                )
 
     def remove_picked_maps(self, picked_maps):
         logger = logging.getLogger(f"{self.__class__.__name__}")
@@ -30,18 +29,22 @@ class MapDict(dict):
             try:
                 del self[picked_map]
             except NameError as e:
-                logger.debug(
-                    traceback.TracebackException.from_exception(e).format())
+                logger.debug(traceback.TracebackException.from_exception(e).format())
                 logger.exception(
-                    f"Tried picking {picked_map} not found in available maps.")
+                    f"Tried picking {picked_map} not found in available maps."
+                )
 
     def to_list(self):
         return list(self)
 
-    def to_list_sorted(self, reversed=False):
-        return sorted(self, key=self.get, reverse=reversed)
+    def update_from_list(self, list):
+        for i, map in enumerate(list):
+            self[map] = i
 
-    def top_n_maps(self, n=len(CSGO_GET_ACTIVE_DUTY.get_active_duty())):
+    def to_list_sorted(self, reverse=False):
+        return sorted(self, key=self.get, reverse=reverse)
+
+    def top_n_maps(self, n=len(csgo.get_active_duty())):
         return sorted(self, key=self.get, reverse=True)[:n]
 
     def copy(self):

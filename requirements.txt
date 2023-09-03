@@ -1,4 +1,5 @@
 pytube
 discord
 dadjokes
-openai
+cachetools
+python-dotenv

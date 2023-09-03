@@ -2,12 +2,12 @@ import math
 import statistics
 import constants
 import random
-from CSGO_GET_ACTIVE_DUTY import get_active_duty
+from csgo import get_active_duty
 from player import Player
 from mapdict import MapDict
 
 
-class Team():
+class Team:
     def __init__(self, id, players, all_players) -> None:
         self.id = id
         self.overallcompatability = math.inf
@@ -21,9 +21,8 @@ class Team():
         self.calculate_overall_compatability()
 
     def get_info(self) -> str:
-        igls = [player.screen_name for player in self.players if player.igl]
-        members = [
-            player.screen_name for player in self.players if not player.igl]
+        igls = [player.display_name for player in self.players if player.igl]
+        members = [player.display_name for player in self.players if not player.igl]
         return f"Team {self.id}:\n\t IGLs: {igls}\n\t Players: {members} [{self.rankcompatability}][{self.mapcompatability}][{self.overallcompatability}]\n"
 
     def set_map_preference(self):
@@ -51,8 +50,7 @@ class Team():
     def calculate_rank_score(self, all_players):
         try:
             avg_rank = statistics.mean([player.rank for player in all_players])
-            avg_team = statistics.mean(
-                [player.rank for player in self.players])
+            avg_team = statistics.mean([player.rank for player in self.players])
         except statistics.StatisticsError:
             avg_rank = 0
             avg_team = 0
@@ -67,7 +65,8 @@ class Team():
                 total_distance += player.map_compatability(other_player)
         try:
             self.mapcompatability = round(
-                (total_distance / (len(get_active_duty()) * len(self.players))), 3)
+                (total_distance / (len(get_active_duty()) * len(self.players))), 3
+            )
         except ZeroDivisionError:
             self.mapcompatability = total_distance
 
@@ -81,14 +80,21 @@ def _choose_players(players, team_size) -> list:
     for _ in range(team_size):
         if len(chosen) == 0:
             igls = [player for player in players if player.igl]
-            applicableIgls = [igl for igl in igls if igl.matches <= min(
-                igl.matches for igl in igls) and igl not in chosen]
+            applicableIgls = [
+                igl
+                for igl in igls
+                if igl.matches <= min(igl.matches for igl in igls) and igl not in chosen
+            ]
             if applicableIgls:
                 igl = random.choice(applicableIgls)
                 chosen.append(igl)
                 continue
-        applicable = [player for player in players if player.matches <= min(
-            player.matches for player in players) and player not in chosen]
+        applicable = [
+            player
+            for player in players
+            if player.matches <= min(player.matches for player in players)
+            and player not in chosen
+        ]
         if not applicable:
             applicable = [player for player in players if player not in chosen]
         player = random.choice(applicable)
@@ -96,21 +102,21 @@ def _choose_players(players, team_size) -> list:
     return chosen
 
 
-def roll_teams(players, num_matches):
+def roll_teams(players: dict, num_matches: int):
     player_pool = [player for player in players.values()]
     for player in player_pool:
         player.chosen = 0
         player.matches = 0
 
     best_teams = {}
-    team_size = constants.team_size if len(
-        players) >= constants.team_size else len(players)
+    team_size = (
+        constants.team_size if len(players) >= constants.team_size else len(players)
+    )
     for i in range(num_matches):
         best_score = math.inf
         best_team = None
         for _ in range(100):
-            team = Team(i, _choose_players(
-                player_pool.copy(), team_size), player_pool)
+            team = Team(i, _choose_players(player_pool.copy(), team_size), player_pool)
             if team.overallcompatability < best_score:
                 best_score = team.overallcompatability
                 best_team = team
