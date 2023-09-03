@@ -192,7 +192,7 @@ class MemberHandler(commands.Cog):
         if not self.bot.is_member(interaction.user):
             return
         await interaction.response.send_message(
-            f"Maps: {m1} {m2} {m3} {m4} {m5} {m6} {m7}"
+            f"Maps: {m1} {m2} {m3} {m4} {m5} {m6} {m7}", ephemeral=True
         )
         choices = await interaction.original_response()
         uniques = set(choices.content.split(" ")[1:])
@@ -208,7 +208,6 @@ class MemberHandler(commands.Cog):
         self.players[interaction.user.id].update_maps(
             list(choices.content.split(" ")[1:])
         )
-        await interaction.response.send_message("Maps added.", ephemeral=True)
         self.store_state()
 
     @add_maps.autocomplete("m1")
