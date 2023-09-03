@@ -1,5 +1,6 @@
 import os
 import logging
+from typing import Optional
 import discord
 from dotenv import load_dotenv
 from discord.ext import commands
@@ -13,6 +14,7 @@ class CSBot(commands.Bot):
         intents = discord.Intents.all()
         super().__init__(command_prefix="!", intents=intents)
         self.config = config
+        self.handlers = ["cogs.member", "cogs.match", "cogs.admin"]
 
     def setup_logging(self):
         log_format = "%(levelname)s %(name)s %(asctime)s - %(message)s"
@@ -43,8 +45,8 @@ class CSBot(commands.Bot):
         return member
 
     async def setup_hook(self) -> None:
-        await self.load_extension("cogs.member")
-        await self.load_extension("cogs.match")
+        for handler in self.handlers:
+            await self.load_extension(handler)
         await self.tree.sync(guild=discord.Object(id=self.config.server_ID))
 
     async def on_ready(self):
