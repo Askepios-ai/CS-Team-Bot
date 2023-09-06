@@ -55,6 +55,35 @@ class AdminHandler(commands.Cog):
         else:
             await interaction.response.send_message(f"Loaded {module}.", ephemeral=True)
 
+    @app_commands.command(
+        name="sync",
+        description="Sync commands.",
+    )
+    @has_permissions(administrator=True)
+    async def sync_commands(self, interaction: discord.Interaction):
+        await self.bot.tree.sync(guild=discord.Object(id=self.bot.config.server_ID))
+        await interaction.response.send_message("Commands synced.", ephemeral=True)
+
+    @app_commands.command(
+        name="timer",
+        description="Set a timer.",
+    )
+    @has_permissions(administrator=True)
+    async def timer(self, interaction: discord.Interaction, time: int):
+        await interaction.response.send_message(
+            f"Timer set for {time} seconds.", ephemeral=True
+        )
+        await asyncio.sleep(time)
+        await interaction.followup.send("Timer expired.", ephemeral=True)
+
+    @app_commands.command(
+        name="reboot",
+        description="Reboots the bot",
+    )
+    @has_permissions(administrator=True)
+    async def reboot(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Rebooting", ephemeral=True)
+        await self.bot.close()
 
 async def setup(bot):
     await bot.add_cog(AdminHandler(bot), guild=discord.Object(id=bot.config.server_ID))
