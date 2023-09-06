@@ -110,8 +110,8 @@ class MemberHandler(commands.Cog):
             or reaction.message_id != self.registration_message.id
         ):
             return
-        self.bot.log.debug(f"Raw reaction add from {reaction.user_id}")
-        reaction.member = self.bot.get_member(reaction.user_id)
+        member = self.bot.get_member(reaction.user_id)
+        self.bot.log.debug(f"Raw reaction add from {member.name}")
         if not reaction.member:
             return
         await self.add_member(reaction.member)
@@ -125,8 +125,8 @@ class MemberHandler(commands.Cog):
             or reaction.message_id != self.registration_message.id
         ):
             return
-        self.bot.log.debug(f"Raw reaction remove from: {reaction.user_id}")
-        reaction.member = self.bot.get_member(reaction.user_id)
+        member = self.bot.get_member(reaction.user_id)
+        self.bot.log.debug(f"Raw reaction remove from: {member.name}")
         if not reaction.member:
             return
         await self.remove_member(reaction.member)
@@ -168,15 +168,18 @@ class MemberHandler(commands.Cog):
     async def list_members_command(self, interaction: discord.Interaction):
         if not self.bot.is_member(interaction.user):
             return
-        discord_string = DiscordString("Members | Banorder:\n")
+        embed = discord.Embed(title="Players", color=0x00FF00)
         for player in self.players.values():
-            discord_string += DiscordString(f"{player.display_name} {player.title}\n")
-            discord_string += DiscordString(f"{player.map_order()}").to_code_inline()
-        await interaction.response.send_message(f"{discord_string}")
+            embed.add_field(
+                name=f"{player.title} `{player.display_name}`",
+                value=player.map_order(),
+                inline=False,
+            )
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
         name="add_maps",
-        description="Add map preference, from most to least wanter.",
+        description="Add map preference, from most to least wanted.",
     )
     async def add_maps(
         self,
@@ -233,6 +236,8 @@ class MemberHandler(commands.Cog):
     )
     async def set_rank(self, interaction: discord.Interaction, rank: str):
         if not self.bot.is_member(interaction.user):
+            return
+        if rank not in ranks.values():
             return
         self.players[interaction.user.id].set_rank(rank)
         await interaction.response.send_message(f"Rank set to {rank}")
