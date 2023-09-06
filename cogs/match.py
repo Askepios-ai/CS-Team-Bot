@@ -60,11 +60,19 @@ class MatchHandler(commands.Cog):
         self.status = "ready"
         self.participating_players = {}
         if self.registration_message:
-            await self.registration_message.delete()
-            self.registration_message = None
+            try:
+                await self.registration_message.delete()
+            except discord.errors.HTTPException as he:
+                self.bot.log.warning(he)
+            finally:
+                self.registration_message = None
         if self.banorder_msg:
-            await self.banorder_msg.delete()
-            self.banorder_msg = None
+            try:
+                await self.banorder_msg.delete()
+            except discord.errors.HTTPException as he:
+                self.bot.log.warning(he)
+            finally:
+                self.banorder_msg = None
 
     @app_commands.command(
         name="start_registration_match",
@@ -77,13 +85,9 @@ class MatchHandler(commands.Cog):
             return
         load_state(self)
         await self.reset_state()
-        if self.banorder_msg:
-            await self.banorder_msg.delete()
-            self.banorder_msg = None
-        self.participating_players = {}
         self.number_of_matches = int(number_of_matches)
         await interaction.response.send_message(
-            f"<@&{self.bot.config.team_role_ID}> Please react to this message to sign up for the [{number_of_matches}] matches on {self.date.strftime('%A %d.%m.%Y at %H:%M')}"
+            f"<@&{self.bot.config.team_role_ID}> Please react to this message to sign up for the [{number_of_matches}] matches on {self.date.strftime('%A %d.%m.%Y at %H:%M')}. We roll teams at {(self.date-timedelta(hours=0, minutes=30)).strftime('%H:%M')}"
         )
         self.registration_message = await interaction.original_response()
         await self.registration_message.add_reaction("✅")
