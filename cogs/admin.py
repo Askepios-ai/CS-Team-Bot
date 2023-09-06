@@ -78,6 +78,15 @@ class AdminHandler(commands.Cog):
         await asyncio.sleep(time)
         await interaction.followup.send("Timer expired.", ephemeral=True)
 
+    @app_commands.command(
+        name="reboot",
+        description="Reboots the bot",
+    )
+    @has_permissions(administrator=True)
+    async def reboot(self, interaction: discord.Interaction):
+        await interaction.response.send_message("Rebooting", ephemeral=True)
+        await self.bot.close()
+
 
 async def setup(bot):
     await bot.add_cog(AdminHandler(bot), guild=discord.Object(id=bot.config.server_ID))
