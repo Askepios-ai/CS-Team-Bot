@@ -1,4 +1,6 @@
+import os
 import discord
+import asyncio
 from discord import app_commands
 from discord.ext import commands
 from discord.ext.commands import has_permissions
@@ -54,6 +56,27 @@ class AdminHandler(commands.Cog):
             )
         else:
             await interaction.response.send_message(f"Loaded {module}.", ephemeral=True)
+
+    @app_commands.command(
+        name="sync",
+        description="Sync commands.",
+    )
+    @has_permissions(administrator=True)
+    async def sync_commands(self, interaction: discord.Interaction):
+        await self.bot.tree.sync(guild=discord.Object(id=self.bot.config.server_ID))
+        await interaction.response.send_message("Commands synced.", ephemeral=True)
+
+    @app_commands.command(
+        name="timer",
+        description="Set a timer.",
+    )
+    @has_permissions(administrator=True)
+    async def timer(self, interaction: discord.Interaction, time: int):
+        await interaction.response.send_message(
+            f"Timer set for {time} seconds.", ephemeral=True
+        )
+        await asyncio.sleep(time)
+        await interaction.followup.send("Timer expired.", ephemeral=True)
 
 
 async def setup(bot):

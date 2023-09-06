@@ -14,7 +14,12 @@ class CSBot(commands.Bot):
         intents = discord.Intents.all()
         super().__init__(command_prefix="!", intents=intents)
         self.config = config
-        self.handlers = ["cogs.member", "cogs.match", "cogs.admin"]
+        self.handlers = [
+            "cogs.member",
+            "cogs.match",
+            "cogs.admin",
+            "cogs.masterblaster",
+        ]
 
     def setup_logging(self):
         log_format = "%(levelname)s %(name)s %(asctime)s - %(message)s"
@@ -73,6 +78,10 @@ class CSBot(commands.Bot):
         else:
             self.log.debug(f"Unknown: {member.name}")
             return Permissions.restricted
+
+    async def unload_all(self):
+        for c in self.handlers:
+            await self.unload_extension(c)
 
 
 if __name__ == "__main__":

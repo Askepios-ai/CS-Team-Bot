@@ -168,11 +168,14 @@ class MemberHandler(commands.Cog):
     async def list_members_command(self, interaction: discord.Interaction):
         if not self.bot.is_member(interaction.user):
             return
-        discord_string = DiscordString("Members | Banorder:\n")
+        embed = discord.Embed(title="Players", color=0x00FF00)
         for player in self.players.values():
-            discord_string += DiscordString(f"{player.display_name} {player.title}\n")
-            discord_string += DiscordString(f"{player.map_order()}").to_code_inline()
-        await interaction.response.send_message(f"{discord_string}")
+            embed.add_field(
+                name=f"{player.title} `{player.name}`",
+                value=player.map_order(),
+                inline=False,
+            )
+        await interaction.response.send_message(embed=embed)
 
     @app_commands.command(
         name="add_maps",
