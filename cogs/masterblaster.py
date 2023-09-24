@@ -94,6 +94,7 @@ class MasterblasterHandler(commands.Cog):
                     next_match = schedule.get_next_match()
                     embed = Embed(title="Next Match", color=0x00FF00)
                     date = parser.isoparse(next_match.get_date_and_time())
+                    date = date + timedelta(hours=2)
                     embed.add_field(
                         name="Date",
                         value=f"{date.day}.{date.month} at {date.hour}:{date.minute}",
@@ -124,6 +125,7 @@ class MasterblasterHandler(commands.Cog):
                     embed = Embed(title="Schedule", color=0x00FF00)
                     for match in schedule.matches:
                         date = parser.isoparse(match.get_date_and_time())
+                        date = date + timedelta(hours=2)
                         embed.add_field(
                             name=f"{date.day}.{date.month} at {date.hour}:{date.minute}",
                             value=f"{match.teams[0].name} vs {match.teams[1].name}",
