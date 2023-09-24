@@ -1,8 +1,11 @@
 import os
 import discord
-import json
+import asyncio
+from masterblaster import MasterBlaster
 from discord.ext import commands
 from discord import app_commands, Embed
+from datetime import datetime, timedelta
+from dateutil import parser
 import requests
 
 MASTERBLASTER_URL = "https://app.masterblaster.gg/"
@@ -16,56 +19,117 @@ ORGANIZAITON = "organization/"
 PLAYERS = "players/"
 
 
-class GameAccount:
-    def __init__(self, id, nick, avatarUrl, gameId) -> None:
-        self.id = id
-        self.nick = nick
-        self.avatar_url = avatarUrl
-        self.gameId = gameId
-
-    def from_json(json: str):
-        return GameAccount(json["id"], json["nick"], json["avatarUrl"], json["gameId"])
-
-
-class MBPlayer:
-    def __init__(self, id, name, avatarUrl, gameAccounts) -> None:
-        self.id = id
-        self.name = name
-        self.avatarUrl = avatarUrl
-        self.gameAccounts = self.parse_game_accounts(gameAccounts)
-
-    def parse_game_accounts(self, gameAccounts):
-        return [GameAccount.from_json(game_account) for game_account in gameAccounts]
-
-    def from_json(json: str):
-        return MBPlayer(
-            json["id"], json["nickName"], json["avatarUrl"], json["gameAccounts"]
-        )
-
-
 class MasterblasterHandler(commands.Cog):
     def __init__(self, bot) -> None:
         self.bot = bot
+        loop = asyncio.get_event_loop()
+        asyncio.ensure_future(self.setup(), loop=loop)
+
+    async def setup(self):
+        self.mb = MasterBlaster(os.getenv("MB_TOKEN"))
 
     @app_commands.command(
-        name="get_players",
-        description="Get the players in organisation",
+        name="get_members",
+        description="Get the members of an organisation",
     )
-    async def get_players(self, interaction: discord.Interaction):
-        await interaction.response.send_message("Getting players", ephemeral=True)
-        response = requests.get(
-            f"{MASTERBLASTER_URL}{INTERNAL_API}{ORGANIZAITON}{self.bot.config.mb_organization_id}/{PLAYERS}"
-        ).json()
-        embed = discord.Embed(title="Players", color=0x00FF00)
-        for player in response:
-            mb_player = MBPlayer.from_json(player)
-            embed.add_field(name=mb_player.name, value=mb_player.id, inline=False)
-        await interaction.followup.send(embed=embed, ephemeral=True)
-        # for player in response:
-        #     mb_player = MBPlayer.from_json(player)
-        #     await interaction.followup.send(mb_player.name, ephemeral=True)
-        #     for game_account in mb_player.gameAccounts:
-        #         await interaction.followup.send(game_account.nick, ephemeral=True)
+    async def get_members(self, interaction: discord.Interaction, org: str):
+        await interaction.response.send_message("Getting members", ephemeral=True)
+        async with self.mb:
+            organisation = await self.mb.get_org_by_name(org)
+            members = await organisation.get_members()
+            embed = Embed(title="Members", color=0x00FF00)
+            for member in members:
+                embed.add_field(
+                    name=member, value=member.player.nick_name, inline=False
+                )
+            await interaction.followup.send(embed=embed, ephemeral=True)
+
+    @get_members.autocomplete("org")
+    async def get_members_autocomplete(
+        self, interaction: discord.Interaction, org: str
+    ) -> list[app_commands.Choice[str]]:
+        async with self.mb:
+            orgs = await self.mb.get_all_orgs()
+            return [app_commands.Choice(name=org.name, value=org.name) for org in orgs]
+
+    async def next_match_autocomplete_org(
+        self, interaction: discord.Interaction, org: str
+    ) -> list[app_commands.Choice[str]]:
+        async with self.mb:
+            orgs = await self.mb.get_all_orgs()
+            return [app_commands.Choice(name=org.name, value=org.name) for org in orgs]
+
+    async def next_match_autocomplete_team(
+        self, interaction: discord.Interaction, team: str
+    ) -> list[app_commands.Choice[str]]:
+        async with self.mb:
+            org = None
+            try:
+                org = interaction.namespace["org"]
+            except KeyError:
+                return [
+                    app_commands.Choice(name="No team found", value="No team found")
+                ]
+            org = await self.mb.get_org_by_name(org)
+            teams = await org.get_teams()
+            return [
+                app_commands.Choice(name=team.name, value=team.name) for team in teams
+            ]
+
+    @app_commands.command(
+        name="next_mb",
+        description="Get info for next match",
+    )
+    @app_commands.autocomplete(
+        org=next_match_autocomplete_org, team=next_match_autocomplete_team
+    )
+    async def next_match(self, interaction: discord.Interaction, org: str, team: str):
+        async with self.mb:
+            org = await self.mb.get_org_by_name(org)
+            await asyncio.sleep(1)
+            teams = await org.get_teams()
+            for t in teams:
+                if t.name == team:
+                    schedule = await t.get_schedule()
+                    next_match = schedule.get_next_match()
+                    embed = Embed(title="Next Match", color=0x00FF00)
+                    date = parser.isoparse(next_match.get_date_and_time())
+                    embed.add_field(
+                        name="Date",
+                        value=f"{date.day}.{date.month} at {date.hour}:{date.minute}",
+                        inline=False,
+                    )
+                    embed.add_field(name="Home", value=next_match.teams[0].name)
+                    embed.add_field(name="", value="vs")
+                    embed.add_field(name="Visiting", value=next_match.teams[1].name)
+                    await interaction.response.send_message(
+                        embed=embed, ephemeral=False
+                    )
+
+    @app_commands.command(
+        name="get_schedule",
+        description="Get the schedule of a team",
+    )
+    @app_commands.autocomplete(
+        org=next_match_autocomplete_org, team=next_match_autocomplete_team
+    )
+    async def get_schedule(self, interaction: discord.Interaction, org: str, team: str):
+        async with self.mb:
+            org = await self.mb.get_org_by_name(org)
+            await asyncio.sleep(1)
+            teams = await org.get_teams()
+            for t in teams:
+                if t.name == team:
+                    schedule = await t.get_schedule()
+                    embed = Embed(title="Schedule", color=0x00FF00)
+                    for match in schedule.matches:
+                        date = parser.isoparse(match.get_date_and_time())
+                        embed.add_field(
+                            name=f"{date.day}.{date.month} at {date.hour}:{date.minute}",
+                            value=f"{match.teams[0].name} vs {match.teams[1].name}",
+                            inline=False,
+                        )
+                    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):

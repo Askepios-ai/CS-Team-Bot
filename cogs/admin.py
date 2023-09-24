@@ -42,10 +42,20 @@ class AdminHandler(commands.Cog):
                 f"Unloaded {module}.", ephemeral=True
             )
 
+    async def get_all_extensions(
+        self, interaction: discord.Interaction, module: str
+    ) -> list[app_commands.Choice[str]]:
+        extensions = []
+        for file in os.listdir("cogs"):
+            if file.endswith(".py"):
+                extensions.append(app_commands.Choice(name=file[:-3], value=file[:-3]))
+        return extensions
+
     @app_commands.command(
         name="reload_extension",
         description="Reload an extension.",
     )
+    @app_commands.autocomplete(module=get_all_extensions)
     @has_permissions(administrator=True)
     async def reload(self, interaction: discord.Interaction, module: str):
         try:

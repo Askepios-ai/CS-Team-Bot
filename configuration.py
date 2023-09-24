@@ -50,42 +50,41 @@ class Configuration(abc.MutableMapping):
     def _setupCfgTerminal(self):
         self.log.debug("Setting up configuration from terminal")
         try:
-            keys = "guild role owner_ID team_role_ID broadcast_channel server_ID"
-            vals = [
-                None, None,
-                int(input("OwnerID: ")), int(input("Team role ID: ")),
-                input("Name of broadcast channel: "), int(input("Server ID: "))
-            ]
-            self.__config = {k: v for k, v in zip(keys.split(), vals)}
+            expected = json.load(open("config_example.json", "r"))
+            keys = [k for k in expected]
+            vals = [input(f"{k}?: ") for k in keys]
+            self.__config = {k: v for k, v in zip(keys, vals)}
             self.save()
 
         except Exception as e:
             self.log.warning("Setup from terminal failed")
             self.log.debug(
-                "".join(
-                    traceback.TracebackException.from_exception(e).format()
-                ))
+                "".join(traceback.TracebackException.from_exception(e).format())
+            )
             raise e.with_traceback(e.__traceback__)
 
     def setup(self):
         self.log.debug("Configuration setup")
         loaded = False
-        while (not loaded):
+        while not loaded:
             try:
                 self.load()
                 loaded = True
             except (
-                    FileNotFoundError, json.decoder.JSONDecodeError, KeyError
+                FileNotFoundError,
+                json.decoder.JSONDecodeError,
+                KeyError,
             ) as configError:
                 self.log.debug(f"{configError}")
-                if input("Would you like to setup the config from the terminal? y/n ") == 'y':
+                if (
+                    input("Would you like to setup the config from the terminal? y/n ")
+                    == "y"
+                ):
                     self._setupCfgTerminal()
                 else:
                     exit(f"Please setup your config: {self.config_file}")
             except Exception as e:
                 self.log.warning(
-                    "".join(
-                        traceback.TracebackException.from_exception(e).format()
-                    )
+                    "".join(traceback.TracebackException.from_exception(e).format())
                 )
                 raise e.with_traceback(e.__traceback__)

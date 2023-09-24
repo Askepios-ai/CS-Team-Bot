@@ -3,3 +3,4 @@ discord
 dadjokes
 cachetools
 python-dotenv
+masterblaster.py
