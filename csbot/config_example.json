@@ -2,6 +2,5 @@
     "server_ID": null,
     "owner_ID": null,
     "team_role_ID": null,
-    "broadcast_channel": null,
-    "state_storage_file": null
+    "broadcast_channel": null
 }

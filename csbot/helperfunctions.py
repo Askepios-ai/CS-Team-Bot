@@ -1,3 +1,4 @@
+import os
 import math
 import pickle
 import discord
@@ -86,7 +87,7 @@ def log_message(function):
 def persist_state(function):
     async def persist_state(self, *args, **kwargs):
         await function(self, *args, **kwargs)
-        with open(self.bot.config.state_storage_file, "wb") as f:
+        with open("/home/.csbot/state", "wb") as f:
             pickle.dump(self.players, f)
 
     return persist_state
@@ -96,7 +97,7 @@ def load_state(function):
     def load_state(self, *args, **kwargs):
         function(self, *args, **kwargs)
         try:
-            with open(self.bot.config.state_storage_file, "rb") as f:
+            with open("/home/.csbot/state", "rb") as f:
                 self.players = pickle.load(f)
         except FileNotFoundError:
             self.players = {}

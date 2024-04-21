@@ -1,3 +1,4 @@
+import os
 import discord
 import pickle
 from discord import app_commands
@@ -6,6 +7,8 @@ from constants import ranks
 from player import Player
 from helperfunctions import load_state, persist_state
 from csgo import get_active_duty
+
+__all__ = ["MemberHandler"]
 
 
 class MemberHandler(commands.Cog):
@@ -16,7 +19,7 @@ class MemberHandler(commands.Cog):
         self.registration_message = None
 
     def store_state(self):
-        with open(self.bot.config.state_storage_file, "wb") as f:
+        with open("/home/.csbot/state", "wb") as f:
             pickle.dump(self.players, f)
 
     @app_commands.command(
@@ -109,9 +112,7 @@ class MemberHandler(commands.Cog):
         ):
             return
         member = self.bot.get_member(reaction.user_id)
-        self.bot.log.debug(
-            f"{__class__.__qualname__}: Raw reaction add from {member.name}"
-        )
+        self.bot.log.debug(f"{__class__.__qualname__}: Raw reaction from {member.name}")
         if not reaction.member:
             return
         await self.add_member(reaction.member)
