@@ -4,9 +4,8 @@ import asyncio
 from masterblaster import MasterBlaster
 from discord.ext import commands
 from discord import app_commands, Embed
-from datetime import datetime, timedelta
+from datetime import timedelta
 from dateutil import parser
-import requests
 
 MASTERBLASTER_URL = "https://app.masterblaster.gg/"
 PUBLIC_API = "api/external/v1/"
@@ -33,7 +32,7 @@ class MasterblasterHandler(commands.Cog):
         description="Get the members of an organisation",
     )
     async def get_members(self, interaction: discord.Interaction, org: str):
-        await interaction.response.send_message("Getting members", ephemeral=True)
+        await interaction.response.send_message("Getting members", ephemeral=False)
         async with self.mb:
             organisation = await self.mb.get_org_by_name(org)
             members = await organisation.get_members()
@@ -135,6 +134,8 @@ class MasterblasterHandler(commands.Cog):
 
 
 async def setup(bot: commands.Bot):
+    if not os.getenv("MB_TOKEN"):
+        raise LookupError("No Masterblaster token found")
     await bot.add_cog(
         MasterblasterHandler(bot), guild=discord.Object(id=bot.config.server_ID)
     )

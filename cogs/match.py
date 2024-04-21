@@ -1,13 +1,8 @@
 import discord
-import requests
-import pickle
 from datetime import datetime, timedelta
 from discord import app_commands
 from discord.ext import commands
-from constants import Permissions
-from cachetools import TTLCache, cached
-from player import Player
-from helperfunctions import DiscordString, load_state, persist_state
+from helperfunctions import DiscordString, load_state
 from csgo import get_active_duty
 from team import roll_teams
 from mapdict import MapDict
@@ -156,11 +151,7 @@ class MatchHandler(commands.Cog):
         )
 
     def add_player(self, player):
-        try:
-            self.participating_players[player.id] = self.players[player.id]
-
-        except KeyError:
-            pass
+        self.participating_players[player.id] = self.players[player.id]
 
     @commands.Cog.listener()
     async def on_raw_reaction_add(self, reaction: discord.RawReactionActionEvent):
@@ -171,7 +162,9 @@ class MatchHandler(commands.Cog):
             or reaction.message_id != self.registration_message.id
         ):
             return
-        self.bot.log.debug(f"Raw reaction add from {reaction.user_id}")
+        self.bot.log.debug(
+            f"{__class__.__qualname__} Raw reaction add from {reaction.user_id}"
+        )
         reaction.member = self.bot.get_member(reaction.user_id)
         if not reaction.member:
             return

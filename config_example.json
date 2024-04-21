@@ -1,13 +1,7 @@
 {
-    "guild": null,
-    "role": null,
+    "server_ID": null,
     "owner_ID": null,
     "team_role_ID": null,
     "broadcast_channel": null,
-    "server_ID": null,
-    "persist_file": null,
-    "client_id": null,
-    "masterblaster_team_id": null,
-    "masterblaster_competition_id": null,
-    "masterblaster_organization_id": null
+    "state_storage_file": null
 }

@@ -10,10 +10,20 @@ class AdminHandler(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    async def get_all_extensions(
+        self, interaction: discord.Interaction, module: str
+    ) -> list[app_commands.Choice[str]]:
+        extensions = []
+        for file in os.listdir(f"{os.path.dirname(os.path.abspath(__file__))}"):
+            if file.endswith(".py"):
+                extensions.append(app_commands.Choice(name=file[:-3], value=file[:-3]))
+        return extensions
+
     @app_commands.command(
         name="load",
         description="Load a module.",
     )
+    @app_commands.autocomplete(module=get_all_extensions)
     @has_permissions(administrator=True)
     async def load(self, interaction: discord.Interaction, module: str):
         try:
@@ -29,6 +39,7 @@ class AdminHandler(commands.Cog):
         name="unload",
         description="Unload a module.",
     )
+    @app_commands.autocomplete(module=get_all_extensions)
     @has_permissions(administrator=True)
     async def unload(self, interaction: discord.Interaction, module: str):
         try:
@@ -41,15 +52,6 @@ class AdminHandler(commands.Cog):
             await interaction.response.send_message(
                 f"Unloaded {module}.", ephemeral=True
             )
-
-    async def get_all_extensions(
-        self, interaction: discord.Interaction, module: str
-    ) -> list[app_commands.Choice[str]]:
-        extensions = []
-        for file in os.listdir("cogs"):
-            if file.endswith(".py"):
-                extensions.append(app_commands.Choice(name=file[:-3], value=file[:-3]))
-        return extensions
 
     @app_commands.command(
         name="reload_extension",

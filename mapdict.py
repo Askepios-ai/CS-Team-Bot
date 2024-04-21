@@ -1,3 +1,4 @@
+from __future__ import annotations
 import csgo
 import logging
 import traceback
@@ -5,6 +6,10 @@ import traceback
 
 class MapDict(dict):
     def amplify_most_wanted(self):
+        """
+        Amplify the top 3 most wanted maps by a factor of 16, 8, and 4.
+        Map preferences weigh more than ranks for team composition.
+        """
         factor = len(self.keys())
         weights = [16 * factor, 8 * factor, 4 * factor]
         nmaps = 3
@@ -34,6 +39,11 @@ class MapDict(dict):
                     f"Tried picking {picked_map} not found in available maps."
                 )
 
+    def from_list(self, list) -> MapDict:
+        for i, map in enumerate(list):
+            self[map] = i
+        return self
+
     def to_list(self):
         return list(self)
 
@@ -41,13 +51,16 @@ class MapDict(dict):
         for i, map in enumerate(list):
             self[map] = i
 
-    def to_list_sorted(self, reverse=False):
+    def to_list_sorted(self, reverse=False) -> list:
+        """
+        Return a list of maps sorted by their rank.
+        """
         return sorted(self, key=self.get, reverse=reverse)
 
     def top_n_maps(self, n=len(csgo.get_active_duty())):
         return sorted(self, key=self.get, reverse=True)[:n]
 
-    def copy(self):
+    def copy(self) -> MapDict:
         _dict = MapDict()
         for key, val in self.items():
             _dict[key] = val

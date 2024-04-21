@@ -1,12 +1,10 @@
 import discord
-import requests
 import pickle
 from discord import app_commands
 from discord.ext import commands
-from constants import Permissions, ranks
-from cachetools import TTLCache, cached
+from constants import ranks
 from player import Player
-from helperfunctions import DiscordString, load_state, persist_state
+from helperfunctions import load_state, persist_state
 from csgo import get_active_duty
 
 
@@ -18,7 +16,7 @@ class MemberHandler(commands.Cog):
         self.registration_message = None
 
     def store_state(self):
-        with open(self.bot.config.persist_file, "wb") as f:
+        with open(self.bot.config.state_storage_file, "wb") as f:
             pickle.dump(self.players, f)
 
     @app_commands.command(
@@ -41,8 +39,8 @@ class MemberHandler(commands.Cog):
         if self.registration_message:
             await self.registration_message.delete()
             self.registration_message = None
-        for id in self.players:
-            member = self.bot.get_member(id)
+        for player_id in self.players:
+            member = self.bot.get_member(player_id)
             if member:
                 await member.remove_roles(
                     discord.Object(id=self.bot.config.team_role_ID),
@@ -98,7 +96,7 @@ class MemberHandler(commands.Cog):
         except KeyError:
             pass
         await member.send(
-            f"You have been removed from the member list. Please react to the registration message to rejoin."
+            "You have been removed from the member list. Please react to the registration message to rejoin."
         )
 
     @commands.Cog.listener()
@@ -111,7 +109,9 @@ class MemberHandler(commands.Cog):
         ):
             return
         member = self.bot.get_member(reaction.user_id)
-        self.bot.log.debug(f"Raw reaction add from {member.name}")
+        self.bot.log.debug(
+            f"{__class__.__qualname__}: Raw reaction add from {member.name}"
+        )
         if not reaction.member:
             return
         await self.add_member(reaction.member)
@@ -126,7 +126,7 @@ class MemberHandler(commands.Cog):
         ):
             return
         member = self.bot.get_member(reaction.user_id)
-        self.bot.log.debug(f"Raw reaction remove from: {member.name}")
+        self.bot.log.debug("Raw reaction remove from: %s", member.name)
         if not reaction.member:
             return
         await self.remove_member(reaction.member)
@@ -179,7 +179,7 @@ class MemberHandler(commands.Cog):
 
     @app_commands.command(
         name="add_maps",
-        description="Add map preference, from most to least wanted.",
+        description="Add map preference, from least to most wanted.",
     )
     async def add_maps(
         self,
@@ -194,23 +194,28 @@ class MemberHandler(commands.Cog):
     ):
         if not self.bot.is_member(interaction.user):
             return
+        if interaction.user.id not in self.players:
+            await interaction.response.send_message(
+                "You need to be a team member to set your map preferences."
+            )
+            return
         await interaction.response.send_message(
             f"Maps: {m1} {m2} {m3} {m4} {m5} {m6} {m7}", ephemeral=True
         )
         choices = await interaction.original_response()
         uniques = set(choices.content.split(" ")[1:])
         if len(uniques) != len(get_active_duty()):
-            await choices.edit(content="Please select 7 different maps.")
+            await choices.edit(
+                content=f"Please select {len(get_active_duty())} different maps."
+            )
 
-        for map in uniques:
-            if map not in get_active_duty():
+        for cs_map in uniques:
+            if cs_map not in get_active_duty():
                 await choices.edit(
                     content="Please select maps from the active duty pool."
                 )
                 return
-        self.players[interaction.user.id].update_maps(
-            list(choices.content.split(" ")[1:])
-        )
+        self.players[interaction.user.id].update_maps(choices.content.split(" ")[1:])
         self.store_state()
 
     @add_maps.autocomplete("m1")
@@ -221,13 +226,20 @@ class MemberHandler(commands.Cog):
     @add_maps.autocomplete("m6")
     @add_maps.autocomplete("m7")
     async def add_maps_autocomplete(
-        self, interaction: discord.Interaction, map: str
+        self, interaction: discord.Interaction, cs_map: str
     ) -> list[app_commands.Choice[str]]:
+        """
+        Autocomplete for map names
+        """
+        previosly_selected = [
+            interaction.namespace[key[0]] for key in interaction.namespace
+        ]
         map_pool = get_active_duty()
         return [
             app_commands.Choice(name=choice, value=choice)
             for choice in map_pool
-            if map.lower() in choice.lower()
+            if choice.lower().startswith(cs_map.lower())
+            and choice not in previosly_selected
         ]
 
     @app_commands.command(
@@ -235,11 +247,18 @@ class MemberHandler(commands.Cog):
         description="Set your rank.",
     )
     async def set_rank(self, interaction: discord.Interaction, rank: str):
+        """
+        Set the rank of the player
+        Any integer >= 0 is a valid rank
+        """
         if not self.bot.is_member(interaction.user):
             return
-        if rank not in ranks.values():
+        if interaction.user.id not in self.players:
+            await interaction.response.send_message(
+                "You need to be a member to set your rank."
+            )
             return
-        self.players[interaction.user.id].set_rank(rank)
+        self.players[interaction.user.id].set_rank(int(rank))
         await interaction.response.send_message(f"Rank set to {rank}")
         self.store_state()
 
@@ -247,10 +266,20 @@ class MemberHandler(commands.Cog):
     async def set_rank_autocomplete(
         self, interaction: discord.Interaction, rank: str
     ) -> list[app_commands.Choice[str]]:
+        """
+        Autocomplete for rank
+        """
         return [
-            app_commands.Choice(name=choice, value=choice) for choice in ranks.values()
+            app_commands.Choice(
+                name=f"{rank_value}:{csgo_equivalent}", value=str(rank_value)
+            )
+            for rank_value, csgo_equivalent in ranks.items()
+            if str(rank_value).startswith(rank)
         ]
 
 
 async def setup(bot):
+    """
+    :meta private:
+    """
     await bot.add_cog(MemberHandler(bot), guild=discord.Object(id=bot.config.server_ID))
