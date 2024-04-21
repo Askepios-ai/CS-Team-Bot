@@ -172,7 +172,7 @@ class MemberHandler(commands.Cog):
         embed = discord.Embed(title="Players", color=0x00FF00)
         for player in self.players.values():
             embed.add_field(
-                name=f"{player.title} `{player.name}`",
+                name=f"{player.title}({player.rank}) `{player.name}`",
                 value=player.map_order(),
                 inline=False,
             )
