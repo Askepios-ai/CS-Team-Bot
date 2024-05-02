@@ -25,6 +25,7 @@ class MatchHandler(commands.Cog):
     @load_state
     def __init__(self, bot) -> None:
         self.bot = bot
+        self.players = {}
         self.participating_players = {}
         self.playday = "Wednesday"
         self.weekdays = {

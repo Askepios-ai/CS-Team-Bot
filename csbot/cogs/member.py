@@ -7,6 +7,7 @@ from constants import ranks
 from player import Player
 from helperfunctions import load_state, persist_state
 from csgo import get_active_duty
+from pathlib import Path
 
 __all__ = ["MemberHandler"]
 
@@ -19,7 +20,8 @@ class MemberHandler(commands.Cog):
         self.registration_message = None
 
     def store_state(self):
-        with open("/home/.csbot/state", "wb") as f:
+        # TODO: set this up in config, not hardcoded
+        with open(f"{Path.home()}/.csbot/state", "wb") as f:
             pickle.dump(self.players, f)
 
     @app_commands.command(

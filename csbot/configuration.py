@@ -1,6 +1,8 @@
+import os
 import sys
 import json
 import logging
+from pathlib import Path
 from collections import abc
 
 
@@ -84,6 +86,8 @@ class Configuration(abc.MutableMapping):
         setup the configuration
         """
         self.log.debug("Configuration setup")
+        if not os.path.exists(f"{Path.home()}/.csbot"):
+            os.makedirs(f"{Path.home()}/.csbot")
         loaded = False
         while not loaded:
             try:

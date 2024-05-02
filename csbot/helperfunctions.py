@@ -1,9 +1,10 @@
 import os
 import math
+import csgo
 import pickle
 import discord
 import constants
-import csgo
+from pathlib import Path
 
 
 class DiscordString(str):
@@ -87,7 +88,7 @@ def log_message(function):
 def persist_state(function):
     async def persist_state(self, *args, **kwargs):
         await function(self, *args, **kwargs)
-        with open("/home/.csbot/state", "wb") as f:
+        with open(f"{Path.home()}/.csbot/state", "wb") as f:
             pickle.dump(self.players, f)
 
     return persist_state
@@ -97,7 +98,7 @@ def load_state(function):
     def load_state(self, *args, **kwargs):
         function(self, *args, **kwargs)
         try:
-            with open("/home/.csbot/state", "rb") as f:
+            with open(f"{Path.home()}/.csbot/state", "rb") as f:
                 self.players = pickle.load(f)
         except FileNotFoundError:
             self.players = {}
