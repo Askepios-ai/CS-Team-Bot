@@ -25,13 +25,7 @@ ranks = {
     18000: "Global Elite",
 }
 
-
-class Permissions:
-    restricted = 0
-    standard = 1
-    member = 2
-    admin = 3
-
-
+# Default team size for competitive cs2 is 5
 team_size = 5
+# Set limit for amount of times rolling for an optimal team
 team_roll_limit = 100

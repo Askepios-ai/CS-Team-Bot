@@ -1,27 +1,26 @@
-import asyncio
 import os
 import logging
-from typing import Optional
 import discord
-from dotenv import load_dotenv, find_dotenv
+import json
+from dotenv import load_dotenv
 from discord.ext import commands
-from discord import app_commands
-from configuration import Configuration
-from constants import Permissions
 
 
 class CSBot(commands.Bot):
-    def __init__(self, config):
+    """
+    The main bot class
+    """
+
+    def __init__(self):
         intents = discord.Intents.all()
         super().__init__(command_prefix="!", intents=intents)
-        self.log = None
         self.setup_logging()
-        self.config = config
+        with open("config.json", "r") as f:
+            self.config = json.load(f)
         self.handlers = [
-            "cogs.member",
-            "cogs.match",
-            "cogs.admin",
-            "cogs.masterblaster",
+            "cogs." + cog.removesuffix(".py")
+            for cog in os.listdir("cogs")
+            if cog.endswith(".py")
         ]
 
     def setup_logging(self):
@@ -45,7 +44,20 @@ class CSBot(commands.Bot):
         self.log.addHandler(normal_handler)
         self.log.addHandler(debug_handler)
 
-    def get_member(self, id) -> discord.member.Member:
+    def get_member(self, id: int) -> discord.member.Member:
+        """
+        Given a member id, return the member object
+
+        PARAMETERS
+        ----------
+        id : int
+            The id of the member to return
+
+        RETURNS
+        -------
+        discord.member.Member
+            The member object
+        """
         member = None
         for m in self.get_all_members():
             if m.id == id:
@@ -55,40 +67,34 @@ class CSBot(commands.Bot):
         return member
 
     async def setup_hook(self) -> None:
+        """
+        Setup the extension for the bot
+        Sync without specifying a guild to get all guilds
+        this might take a while!
+        """
         try:
             for handler in self.handlers:
                 await self.load_extension(handler)
         except Exception as e:
             self.log.error("Error loading %s: %s", handler, e)
-        await self.tree.sync(guild=discord.Object(id=self.config.server_ID))
+        await self.tree.sync(guild=discord.Object(id=int(self.config["server_ID"])))
 
     async def on_ready(self):
         self.setup_logging()
         for channel in self.get_all_channels():
-            if channel.name == self.config.broadcast_channel:
+            if channel.name == self.config["broadcast_channel"]:
                 self.broadcast_channel = channel
 
-    def is_member(self, id):
+    def is_member(self, id: int):
+        """
+        Check if the id is a member of the server
+        """
         if id:
             if self.broadcast_channel.permissions_for(id).administrator:
                 return True
             elif self.broadcast_channel.permissions_for(id).manage_roles:
                 return True
         return False
-
-    async def get_permissions(self, member):
-        """
-        Get the permissions of a member
-        """
-        if self.broadcast_channel.permissions_for(member).administrator:
-            self.log.debug("Admin: %s", member.name)
-            return Permissions.admin
-        elif self.broadcast_channel.permissions_for(member).manage_roles:
-            self.log.debug("Member: %s", member.name)
-            return Permissions.member
-        else:
-            self.log.debug("Unknown: %s", member.name)
-            return Permissions.restricted
 
     async def unload_all(self):
         """
@@ -100,5 +106,5 @@ class CSBot(commands.Bot):
 
 if __name__ == "__main__":
     load_dotenv(os.getenv("ENV_FILE"))
-    client = CSBot(Configuration())
+    client = CSBot()
     client.run(os.getenv("DISCORD_TOKEN"))

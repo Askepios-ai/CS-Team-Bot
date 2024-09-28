@@ -2,6 +2,7 @@ from __future__ import annotations
 import csgo
 import logging
 import traceback
+from copy import deepcopy
 
 
 class MapDict(dict):
@@ -58,10 +59,23 @@ class MapDict(dict):
         return sorted(self, key=self.get, reverse=reverse)
 
     def top_n_maps(self, n=len(csgo.get_active_duty())):
+        """
+        Return the top n maps by ranking.
+
+        PARAMETERS
+        ----------
+        n : int
+            The number of maps to return.
+
+        RETURNS
+        -------
+        list
+            The top n maps by ranking.
+        """
         return sorted(self, key=self.get, reverse=True)[:n]
 
     def copy(self) -> MapDict:
-        _dict = MapDict()
-        for key, val in self.items():
-            _dict[key] = val
-        return _dict
+        """
+        Return a copy of the MapDict.
+        """
+        return deepcopy(self)

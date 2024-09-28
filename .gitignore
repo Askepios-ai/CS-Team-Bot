@@ -13,7 +13,6 @@ __pycache__/
 *.db
 
 # config and secrets
-auth
 config.json
 
 # Distribution / packaging

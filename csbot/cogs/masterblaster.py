@@ -137,5 +137,5 @@ async def setup(bot: commands.Bot):
     if not os.getenv("MB_TOKEN"):
         raise LookupError("No Masterblaster token found")
     await bot.add_cog(
-        MasterblasterHandler(bot), guild=discord.Object(id=bot.config.server_ID)
+        MasterblasterHandler(bot), guild=discord.Object(id=bot.config["server_ID"])
     )

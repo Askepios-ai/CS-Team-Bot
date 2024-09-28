@@ -1,4 +1,3 @@
-import os
 import discord
 import pickle
 from discord import app_commands
@@ -48,7 +47,7 @@ class MemberHandler(commands.Cog):
             member = self.bot.get_member(player_id)
             if member:
                 await member.remove_roles(
-                    discord.Object(id=self.bot.config.team_role_ID),
+                    discord.Object(id=self.bot.config["team_role_ID"]),
                     reason="Registration",
                 )
         self.players = {}
@@ -84,7 +83,7 @@ class MemberHandler(commands.Cog):
     @persist_state
     async def add_member(self, member):
         await member.add_roles(
-            discord.Object(id=self.bot.config.team_role_ID),
+            discord.Object(id=self.bot.config["team_role_ID"]),
             reason="Registration",
         )
         self.players[member.id] = Player(member.id, member.name, member.display_name)
@@ -93,7 +92,7 @@ class MemberHandler(commands.Cog):
     @persist_state
     async def remove_member(self, member):
         await member.remove_roles(
-            discord.Object(id=self.bot.config.team_role_ID),
+            discord.Object(id=self.bot.config["team_role_ID"]),
             reason="Registration",
         )
         try:
@@ -280,9 +279,30 @@ class MemberHandler(commands.Cog):
             if str(rank_value).startswith(rank)
         ]
 
+    @app_commands.command(
+        name="link-steam",
+        description="Link your steam account.",
+    )
+    async def link_steam(self, interaction: discord.Interaction, steam_id: str):
+        """
+        Link the steam account of the player
+        """
+        if not self.bot.is_member(interaction.user):
+            return
+        if interaction.user.id not in self.players:
+            await interaction.response.send_message(
+                "You need to be a team member to link your steam account."
+            )
+            return
+        self.players[interaction.user.id].set_steam_id(steam_id)
+        await interaction.response.send_message(f"Steam account linked to {steam_id}")
+        self.store_state()
+
 
 async def setup(bot):
     """
     :meta private:
     """
-    await bot.add_cog(MemberHandler(bot), guild=discord.Object(id=bot.config.server_ID))
+    await bot.add_cog(
+        MemberHandler(bot), guild=discord.Object(id=bot.config["server_ID"])
+    )

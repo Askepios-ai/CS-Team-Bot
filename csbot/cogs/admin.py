@@ -75,7 +75,7 @@ class AdminHandler(commands.Cog):
     )
     @has_permissions(administrator=True)
     async def sync_commands(self, interaction: discord.Interaction):
-        await self.bot.tree.sync(guild=discord.Object(id=self.bot.config.server_ID))
+        await self.bot.tree.sync(guild=discord.Object(id=self.bot.config["server_ID"]))
         await interaction.response.send_message("Commands synced.", ephemeral=True)
 
     @app_commands.command(
@@ -101,4 +101,6 @@ class AdminHandler(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(AdminHandler(bot), guild=discord.Object(id=bot.config.server_ID))
+    await bot.add_cog(
+        AdminHandler(bot), guild=discord.Object(id=bot.config["server_ID"])
+    )

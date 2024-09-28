@@ -83,7 +83,7 @@ class MatchHandler(commands.Cog):
         await self.reset_state()
         self.number_of_matches = int(number_of_matches)
         await interaction.response.send_message(
-            f"<@&{self.bot.config.team_role_ID}> Please react to this message to sign up for the [{number_of_matches}] matches on {self.date.strftime('%A %d.%m.%Y at %H:%M')}. We roll teams at {(self.date-timedelta(hours=0, minutes=30)).strftime('%H:%M')}"
+            f"<@&{self.bot.config['team_role_ID']}> Please react to this message to sign up for the [{number_of_matches}] matches on {self.date.strftime('%A %d.%m.%Y at %H:%M')}. We roll teams at {(self.date-timedelta(hours=0, minutes=30)).strftime('%H:%M')}"
         )
         self.registration_message = await interaction.original_response()
         await self.registration_message.add_reaction("✅")
@@ -429,4 +429,6 @@ class MatchHandler(commands.Cog):
 
 
 async def setup(bot):
-    await bot.add_cog(MatchHandler(bot), guild=discord.Object(id=bot.config.server_ID))
+    await bot.add_cog(
+        MatchHandler(bot), guild=discord.Object(id=bot.config["server_ID"])
+    )

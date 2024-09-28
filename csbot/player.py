@@ -24,6 +24,8 @@ class Player:
     def __init__(self, id, name, display_name):
         self.id = id
         self.display_name = display_name
+        self.steam_id = None
+        self.liga_id = None
         self.name = name
         self.rank = 0
         self.title = constants.ranks[self.rank]

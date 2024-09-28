@@ -2,17 +2,17 @@ import requests
 from cachetools import TTLCache, cached
 
 
-URL = "https://counterstrike.fandom.com/wiki/Category:Active_Duty_Group"
-
-
-def get_page(url):
-    page = requests.get(url)
-    return page.text
-
-
 @cached(cache=TTLCache(maxsize=1, ttl=86400))
 def get_active_duty():
-    page = get_page(URL)
+    """
+    Uses countrestrike.fandom.com to get the current active duty map pool.
+    A tiny bit of html parsing here.
+    Active duty maps are listed bellow "Current Map Pool" header and "Map Pool History" header.
+    All are hrefs to additional pages, so we can extract the map name from the href.
+    """
+    page = requests.get(
+        "https://counterstrike.fandom.com/wiki/Category:Active_Duty_Group"
+    ).text
     lines = page.splitlines()
     ad = []
     for idx, line in enumerate(lines):
@@ -22,12 +22,10 @@ def get_active_duty():
                     return ad
                 if 'href="/wiki/' in line:
                     ad.append(line.split('"')[1].removeprefix("/wiki/"))
-
-
-def main():
-    AD = get_active_duty()
-    print(AD)
+    # In case counterstrike.fandom changes the page layout
+    #  \_O_/
+    return ad
 
 
 if __name__ == "__main__":
-    main()
+    pass

@@ -50,29 +50,13 @@ def infinite_sequence_gen():
 
 
 def euclidean_distance(val1, val2):
+    """
+    Calculates the euclidean distance between two values.
+    """
     return math.sqrt((val1 - val2) ** 2)
 
 
-def list_ranks() -> DiscordString:
-    ranks = ""
-    for rank, title in constants.ranks.items():
-        ranks += f"{rank}:  {title}\n"
-    return DiscordString(ranks)
-
-
-def get_active_duty() -> list:
-    return csgo.get_active_duty()
-
-
-def list_active_duty() -> DiscordString:
-    reply = "Active duty maps: | "
-    for map in csgo.get_active_duty():
-        reply += f"{map} |"
-    reply += "\n"
-    return DiscordString(reply)
-
-
-def log_message(function):
+def log_request(function):
     async def inner(self, message):
         if isinstance(message, discord.RawReactionActionEvent):
             self.log.info(f"{message.user_id} calling: {function.__name__}")
